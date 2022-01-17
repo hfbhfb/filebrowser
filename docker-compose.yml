@@ -1,0 +1,9 @@
+version: "3.3"
+services:
+  filebrowserapp:
+    image: filebrowserapp:v1
+    restart: always
+    ports:
+      - "38111:38111"
+    volumes:
+      - "/home/usera/hfb:/datadir"

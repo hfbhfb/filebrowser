@@ -1,8 +1,8 @@
 {
-  "port": 80,
-  "baseURL": "",
-  "address": "",
-  "log": "stdout",
-  "database": "/database.db",
-  "root": "/srv"
+    "port": 38111,
+    "baseURL": "",
+    "address": "",
+    "log": "stdout",
+    "database": "/datadir/database.db",
+    "root": "/datadir"
 }

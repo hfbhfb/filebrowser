@@ -1,68 +1,50 @@
-include common.mk
-include tools.mk
+# Self documented Makefile
+# http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
+# SERVER1=aws1
+SERVER1=gz1
+# SERVER1=ubuntu111
+DockerImage=filebrowserapp
+DockerImageVersion=v1
+#DockerPortMap="-p 9801:9801" #不用这个改成了docker-compose
+RemotePWD=`ssh $(SERVER1) "pwd"`
+DockerVolume="-v $(RemotePWD)/aaa:/data"
 
-LDFLAGS += -X "$(MODULE)/version.Version=$(VERSION)" -X "$(MODULE)/version.CommitSHA=$(VERSION_HASH)"
 
-## Build:
+FixedDockerImageInfo=$(DockerImage):$(DockerImageVersion)
+FixedServerDir=~/tmp/$(FixedDockerImageInfo)
+FixedDockerlizeDir=/Users/hfb/test/dockerlizedir
+FixedDir=program
+FixedAppName=runableapp
+#FixedDir #FixedAppName  在dockerfile里面写死了的
+FixedDockerlizeProgram=$(FixedDockerlizeDir)/$(FixedDir)
+FixedProgramTar=$(FixedDir).tar
+FixedDockerlizeTar=$(FixedDockerlizeDir)/$(FixedProgramTar)
 
-.PHONY: build
-build: | build-frontend build-backend ## Build binary
+all:dockerlize
+	@echo " all"
 
-.PHONY: build-frontend
-build-frontend: ## Build frontend
-	$Q cd frontend && npm ci && npm run build
+dockerlize:dirperpare
+	ssh $(SERVER1) "rm -Rf $(FixedServerDir)"
+	ssh $(SERVER1) "mkdir -p $(FixedServerDir)"
+	scp $(FixedDockerlizeTar) $(SERVER1):$(FixedServerDir)/$(FixedProgramTar)
+	ssh $(SERVER1) "cd $(FixedServerDir) && tar xf $(FixedProgramTar)"
+	ssh $(SERVER1) "cd $(FixedServerDir)/$(FixedDir) && docker build -t $(FixedDockerImageInfo) ."
+	# -ssh $(SERVER1) " docker stop app$(DockerImage) "
+	# -ssh $(SERVER1) " docker rm app$(DockerImage)"
+	# -ssh $(SERVER1) " docker run -d --name app$(DockerImage) $(DockerPortMap) $(DockerVolume) $(FixedDockerImageInfo) "
+	-ssh $(SERVER1) "cd $(FixedServerDir)/$(FixedDir) && docker-compose rm -f -s "
+	-ssh $(SERVER1) "cd $(FixedServerDir)/$(FixedDir) && docker-compose up -d "
+	@echo 'dockerlized'
 
-.PHONY: build-backend
-build-backend: ## Build backend
-	$Q $(go) build -ldflags '$(LDFLAGS)' -o .
+dirperpare:
+	rm -Rf $(FixedDockerlizeDir)
+	mkdir -p $(FixedDockerlizeProgram)
+	env GOOS=linux GOARCH=386 go build -o $(FixedAppName)
+	cp $(FixedAppName) $(FixedDockerlizeProgram) 
+	cp docker_config.json $(FixedDockerlizeProgram)/.filebrowser.json
+	cp Dockerfile $(FixedDockerlizeProgram)
+	cp docker-compose.yml $(FixedDockerlizeProgram)
+	cd $(FixedDockerlizeDir) && tar cf $(FixedProgramTar) $(FixedDir)
 
-.PHONY: test
-test: | test-frontend test-backend ## Run all tests
 
-.PHONY: test-frontend
-test-frontend: ## Run frontend tests
 
-.PHONY: test-backend
-test-backend: ## Run backend tests
-	$Q $(go) test -v ./...
-
-.PHONY: lint
-lint: lint-frontend lint-backend lint-commits ## Run all linters
-
-.PHONY: lint-frontend
-lint-frontend: ## Run frontend linters
-	$Q cd frontend && npm ci && npm run lint
-
-.PHONY: lint-backend
-lint-backend: | $(golangci-lint) ## Run backend linters
-	$Q $(golangci-lint) run -v
-
-.PHONY: lint-commits
-lint-commits: $(commitlint) ## Run commit linters
-	$Q ./scripts/commitlint.sh
-
-fmt: $(goimports) ## Format source files
-	$Q $(goimports) -local $(MODULE) -w $$(find . -type f -name '*.go' -not -path "./vendor/*")
-
-clean: clean-tools ## Clean
-
-## Release:
-
-.PHONY: bump-version
-bump-version: $(standard-version) ## Bump app version
-	$Q ./scripts/bump_version.sh
-
-## Help:
-help: ## Show this help
-	@echo ''
-	@echo 'Usage:'
-	@echo '  ${YELLOW}make${RESET} ${GREEN}<target> [options]${RESET}'
-	@echo ''
-	@echo 'Options:'
-	@$(call global_option, "V [0|1]", "enable verbose mode (default:0)")
-	@echo ''
-	@echo 'Targets:'
-	@awk 'BEGIN {FS = ":.*?## "} { \
-		if (/^[a-zA-Z_-]+:.*?##.*$$/) {printf "    ${YELLOW}%-20s${GREEN}%s${RESET}\n", $$1, $$2} \
-		else if (/^## .*$$/) {printf "  ${CYAN}%s${RESET}\n", substr($$1,4)} \
-		}' $(MAKEFILE_LIST)
